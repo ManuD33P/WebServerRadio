@@ -191,12 +191,11 @@ export class WebSocketServer {
   /**
    * Envía un mensaje a todos los clientes conectados
    */
-  public broadcast(message: string | object): void {
-    const messageString = typeof message === 'string' ? message : JSON.stringify(message);
+  public broadcast(message: string): void {
     
     this.clients.forEach(client => {
       if (client.readyState === 1) { // 1 = OPEN
-        client.send(messageString);
+        client.send(message);
       }
     });
   }

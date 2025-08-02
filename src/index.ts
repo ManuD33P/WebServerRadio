@@ -85,7 +85,6 @@ server
       
       // Reenviar al servidor externo
       externalWsClient.send(`PUBLIC: ${userName} > ${messageText}`);
-      console.log(`Mensaje público de ${userName}: ${messageText}`);
       return;
     }
 

@@ -16,7 +16,7 @@ export class WebSocketClient {
   private isConnected: boolean = false;
   private autoReconnect: boolean = true;
   private pingInterval: NodeJS.Timeout | null = null;
-
+  private intervalReconnect: NodeJS.Timeout | null = null;
   constructor(url: string) {
     this.url = url;
   }
@@ -57,7 +57,7 @@ export class WebSocketClient {
         console.error('Error al recibir mensaje:', error);
       } finally {
         const server = WebSocketServer.getInstance();
-        server.broadcast(data);
+        server.broadcast(data.toString());
       }
     });
 
@@ -92,8 +92,14 @@ export class WebSocketClient {
     
     console.log(`Reconectando en ${delay / 1000} segundos... (Intento ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
     
-    setTimeout(() => {
-      this.connect();
+   this.intervalReconnect = setTimeout(() => {
+      if(!this.isConnected){
+        this.connect();
+      } else {
+        if(this.intervalReconnect){
+          clearTimeout(this.intervalReconnect);
+        }
+      }
     }, delay);
   }
 
@@ -102,6 +108,7 @@ export class WebSocketClient {
    */
   public send(message: string): void {
     if (this.ws && this.isConnected) {
+      console.log('Enviando mensaje al servidor WebSocket:', message);
       this.ws.send(message);
     } else {
       console.error('No hay conexión WebSocket activa');
