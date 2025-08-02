@@ -12,7 +12,7 @@ export class WebSocketClient {
   private connectionHandlers: Set<ConnectionHandler> = new Set();
   private reconnectAttempts: number = 0;
   private maxReconnectAttempts: number = 5;
-  private reconnectInterval: number = 3000; // 3 segundos
+  private reconnectInterval: number = 10000; // 3 segundos
   private isConnected: boolean = false;
   private autoReconnect: boolean = true;
   private pingInterval: NodeJS.Timeout | null = null;
@@ -107,7 +107,7 @@ export class WebSocketClient {
    * Envía un mensaje al servidor WebSocket
    */
   public send(message: string): void {
-    if (this.ws && this.isConnected) {
+    if (this.ws) {
       console.log('Enviando mensaje al servidor WebSocket:', message);
       this.ws.send(message);
     } else {
