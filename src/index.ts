@@ -13,8 +13,8 @@ console.log('Módulos importados correctamente');
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = process.env.HOST || '0.0.0.0';
 
-// Crear instancia del servidor WebSocket
-const server = new WebSocketServer({
+// Obtener la instancia única del servidor WebSocket
+const server = WebSocketServer.getInstance({
   port: PORT,
   hostname: HOST,
   development: process.env.NODE_ENV !== 'production'
@@ -51,16 +51,14 @@ server
     if (msg.startsWith('LOGIN:')) {
       const user = User.fromLoginMessage(msg);
       if (user) {
-        // Asignar el ID del socket al usuario
-        user.socketId = ws.data.id;
-        
+    
         // Guardar el usuario en la lista
         userList.addUser(user);
         
         // Actualizar el ID del usuario en el websocket
         ws.data.userId = user.name;
         
-        console.log(`Usuario autenticado: ${user.name}`);
+        console.log(`Usuario autenticado: ${ws.data.userId}`);
         
         // Enviar confirmación al cliente
         ws.send(`LOGIN_OK:${user.name}`);

@@ -1,5 +1,6 @@
 import { WebSocket } from 'ws';
 import {createLogin} from './class/loginSocket';
+import { WebSocketServer } from './WebSocketServer';
 
 type MessageHandler = (data: any) => void;
 type ConnectionHandler = () => void;
@@ -52,7 +53,10 @@ export class WebSocketClient {
         }
         
       } catch (error) {
-        
+        console.error('Error al recibir mensaje:', error);
+      } finally {
+        const server = WebSocketServer.getInstance();
+        server.broadcast(data);
       }
     });
 

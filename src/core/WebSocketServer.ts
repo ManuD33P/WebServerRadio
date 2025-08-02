@@ -14,6 +14,7 @@ interface WebSocketServerOptions {
 }
 
 export class WebSocketServer {
+  private static instance: WebSocketServer | null = null;
   private server: Bun.Serve | null = null;
   private clients: Map<string, Bun.ServerWebSocket<WebSocketData>> = new Map();
   private options: Required<WebSocketServerOptions>;
@@ -21,8 +22,25 @@ export class WebSocketServer {
   private onMessageHandler: MessageHandler = () => {};
   private onCloseHandler: WebSocketHandler = () => {};
   private onErrorHandler: (error: Error) => void = () => {};
+  private isStarting: boolean = false;
+  private startPromise: Promise<void> | null = null;
 
-  constructor(options: WebSocketServerOptions = {}) {
+  /**
+   * Obtiene la instancia única del WebSocketServer
+   * @param options Opciones de configuración (solo se aplican en la primera llamada)
+   * @returns La instancia única de WebSocketServer
+   */
+  public static getInstance(options: WebSocketServerOptions = {}): WebSocketServer {
+    if (!WebSocketServer.instance) {
+      WebSocketServer.instance = new WebSocketServer(options);
+    }
+    return WebSocketServer.instance;
+  }
+
+  /**
+   * Constructor privado para forzar el uso de getInstance
+   */
+  private constructor(options: WebSocketServerOptions = {}) {
     this.options = {
       port: options.port || 3000,
       hostname: options.hostname || '0.0.0.0',
@@ -33,8 +51,24 @@ export class WebSocketServer {
   /**
    * Inicia el servidor WebSocket
    */
-  public start(): Promise<void> {
-    return new Promise((resolve, reject) => {
+  /**
+   * Inicia el servidor WebSocket si no está ya en ejecución
+   * @returns Una promesa que se resuelve cuando el servidor está listo
+   */
+  public async start(): Promise<void> {
+    // Si ya hay una instancia en ejecución, devolver la promesa existente
+    if (this.server) {
+      return this.startPromise || Promise.resolve();
+    }
+
+    // Si ya se está iniciando, devolver la promesa existente
+    if (this.isStarting && this.startPromise) {
+      return this.startPromise;
+    }
+
+    // Inicializar la promesa de inicio
+    this.isStarting = true;
+    this.startPromise = new Promise<void>((resolve, reject) => {
       try {
         const { port, hostname, development } = this.options;
         
@@ -44,7 +78,7 @@ export class WebSocketServer {
           hostname,
           fetch: this.handleUpgrade.bind(this),
           websocket: {
-            open: (ws:  Bun.ServerWebSocket<WebSocketData>) => this.handleOpen(ws),
+            open: (ws: Bun.ServerWebSocket<WebSocketData>) => this.handleOpen(ws),
             message: (ws: Bun.ServerWebSocket<WebSocketData>, message: string | Buffer) => 
               this.handleMessage(ws, message),
             close: (ws: Bun.ServerWebSocket<WebSocketData>) => this.handleClose(ws),
@@ -53,11 +87,8 @@ export class WebSocketServer {
           }
         });
 
-        console.log(`🚀 Servidor WebSocket iniciado en:
-  - URL: ws://${hostname === '0.0.0.0' ? 'localhost' : hostname}:${port}
-  - Entorno: ${development ? 'Desarrollo' : 'Producción'}
-  - Modo: Detrás de ISS (SSL manejado externamente)`);
-
+        console.log(`✅ Servidor WebSocket iniciado en ${hostname}:${port}`);
+        this.isStarting = false;
         resolve();
       } catch (error) {
         console.error('❌ Error al iniciar el servidor WebSocket:', error);
@@ -82,15 +113,12 @@ export class WebSocketServer {
    */
   private handleUpgrade(req: Request, server: any): Response | undefined {
     const url = new URL(req.url);
-    
-    // Aquí puedes agregar lógica de autenticación o validación
-    console.log(`🔌 Nueva solicitud de conexión: ${req.method} ${url.pathname}`);
-    
-    // Aceptar la conexión WebSocket
+    console.log(`Nueva solicitud de conexión: ${req.method} ${url.pathname}`);
     const success = server.upgrade(req);
     if (!success) {
       return new Response('Upgrade failed', { status: 400 });
     }
+    return undefined; // Indica que la solicitud fue manejada correctamente
   }
 
   /**
