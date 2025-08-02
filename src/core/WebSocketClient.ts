@@ -1,163 +1,66 @@
 import { WebSocket } from 'ws';
-import {createLogin} from './class/loginSocket';
-import { WebSocketServer } from './WebSocketServer';
+import { ServerSocket } from './WebSocketServer';
+import { createLogin } from './class/loginSocket';
+import { ClientMessageHandler } from './handlers/clientMessageHandler';
 
-type MessageHandler = (data: any) => void;
-type ConnectionHandler = () => void;
-
-export class WebSocketClient {
-  private ws: WebSocket | null = null;
-  private url: string;
-  private messageHandlers: Set<MessageHandler> = new Set();
-  private connectionHandlers: Set<ConnectionHandler> = new Set();
-  private reconnectAttempts: number = 0;
-  private maxReconnectAttempts: number = 5;
-  private reconnectInterval: number = 10000; // 3 segundos
-  private isConnected: boolean = false;
-  private autoReconnect: boolean = true;
-  private pingInterval: NodeJS.Timeout | null = null;
-  private intervalReconnect: NodeJS.Timeout | null = null;
-  constructor(url: string) {
-    this.url = url;
+export class WebSocketClient{
+  private static instance: WebSocketClient;
+  private client: WebSocket | null = null;
+  private intervalPing: NodeJS.Timeout | 0 = 0;
+  private messageHandler: ClientMessageHandler;
+  
+  private constructor(){
+    this.messageHandler = new ClientMessageHandler();
+    
   }
 
-  /**
-   * Conecta al servidor WebSocket
-   */
-  public connect(): void {
-    if (this.ws) {
-      this.ws.removeAllListeners();
-      this.ws = null;
+  public static getInstance(): WebSocketClient {
+    if (!WebSocketClient.instance) {
+        WebSocketClient.instance = new WebSocketClient();
     }
+    return WebSocketClient.instance;
+  }
 
-    console.log(`Conectando a ${this.url}...`);
-    this.ws = new WebSocket(this.url);
-
-    this.ws.on('open', () => {
-      console.log('Conexión WebSocket establecida');
-      this.isConnected = true;
-      this.reconnectAttempts = 0;
-      this.connectionHandlers.forEach(handler => handler());
-      this.ws?.send(createLogin("RadioWeb","Radio Web by Manu16"));
-
-    });
-
-    this.ws.on('message', (data: string | Buffer) => {
-      try {
-        console.log(data.toString())
-        const newData = data.toString();
-        if(newData.startsWith("ACK")){
-          this.pingInterval = setInterval(() => {
-            this.send("PING:");
-          }, 13000);
-          this.send("PING:")
-        }
+  connect(): void {
+      this.client = new WebSocket('ws://186.137.241.231:46579');
+      if (!this.client) return;
+      this.client.on('open', () => {
+        console.log('Cliente conectado');
+        const login = createLogin('RadioWebChat', 'Radio Web Chat by Manu16')
+        this.send(login);
+      });
+      this.client.on('message', (message: Buffer) => {
+        const newMessage = message.toString();
+        console.log('Mensaje recibido del servidor remoto:', newMessage);
         
-      } catch (error) {
-        console.error('Error al recibir mensaje:', error);
-      } finally {
-        const server = WebSocketServer.getInstance();
-        server.broadcast(data.toString());
-      }
-    });
-
-    this.ws.on('close', () => {
-      console.log('Conexión WebSocket cerrada');
-      this.isConnected = false;
-      this.handleReconnect();
-      if(this.pingInterval){
-        clearInterval(this.pingInterval);
-        this.pingInterval = null;
-      }
-    });
-
-    this.ws.on('error', (error: Error) => {
-      console.error('Error en la conexión WebSocket:', error);
-      this.isConnected = false;
-      this.handleReconnect();
-    });
-  }
-
-  /**
-   * Maneja la reconexión automática
-   */
-  private handleReconnect(): void {
-    if (!this.autoReconnect || this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.log('Número máximo de intentos de reconexión alcanzado');
-      return;
-    }
-
-    this.reconnectAttempts++;
-    const delay = this.reconnectInterval * this.reconnectAttempts;
-    
-    console.log(`Reconectando en ${delay / 1000} segundos... (Intento ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
-    
-   this.intervalReconnect = setTimeout(() => {
-      if(!this.isConnected){
-        this.connect();
-      } else {
-        if(this.intervalReconnect){
-          clearTimeout(this.intervalReconnect);
+        if (newMessage.startsWith('ACK')) {
+          if (!this.intervalPing) {
+            this.intervalPing = setInterval(() => {
+              this.client?.send('PING:');
+            }, 13000);
+          }
+        } else {
+          // Procesar el mensaje con el manejador
+          this.messageHandler.handleIncomingMessage(newMessage);
         }
-      }
-    }, delay);
+      });
+      this.client.on('close', () => {
+        console.log('Cliente desconectado');
+      });
+      this.client.on('error', (error) => {
+        console.log('Error', error);
+      });
   }
 
-  /**
-   * Envía un mensaje al servidor WebSocket
-   */
-  public send(message: string): void {
-    if (this.ws) {
-      console.log('Enviando mensaje al servidor WebSocket:', message);
-      this.ws.send(message);
-    } else {
-      console.error('No hay conexión WebSocket activa');
-    }
+  send(message: string): void {
+    console.log('Enviando mensaje', message);
+    if (!this.client) return;
+    this.client.send(message);
   }
 
-  /**
-   * Cierra la conexión WebSocket
-   */
-  public close(): void {
-    this.autoReconnect = false;
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
-    }
+  close(): void {
+    if (!this.client) return;
+    this.client.close();
   }
 
-  /**
-   * Registra un manejador para mensajes entrantes
-   */
-  public onMessage(handler: MessageHandler): void {
-    this.messageHandlers.add(handler);
-  }
-
-  /**
-   * Registra un manejador para eventos de conexión
-   */
-  public onConnection(handler: ConnectionHandler): void {
-    this.connectionHandlers.add(handler);
-  }
-
-  /**
-   * Elimina un manejador de mensajes
-   */
-  public offMessage(handler: MessageHandler): void {
-    this.messageHandlers.delete(handler);
-  }
-
-  /**
-   * Elimina un manejador de conexión
-   */
-  public offConnection(handler: ConnectionHandler): void {
-    this.connectionHandlers.delete(handler);
-  }
-
-  /**
-   * Verifica si hay conexión activa
-   */
-  public get connected(): boolean {
-    return this.isConnected;
-  }
 }

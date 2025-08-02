@@ -2,7 +2,7 @@
  * Generates a cryptographically secure GUID
  * @returns A string containing a GUID in uppercase
  */
-function generateGUID(): string {
+export function generateGUID(): string {
   // Usar el módulo crypto de Node.js
   const crypto = require('crypto');
   // Generar 16 bytes aleatorios

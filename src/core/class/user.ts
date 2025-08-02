@@ -38,23 +38,63 @@ export class User {
    */
   static fromLoginMessage(loginMessage: string): User | null {
     try {
-      // Extraer la parte de los datos después del segundo ":"
+      console.log('Mensaje de login completo:', loginMessage);
+      
+      // Formato: "LOGIN:4,32,12,15,13,24,12:5000<GUID>name..."
+      const [header, data] = loginMessage.split(':');
+      if (!data) return null;
+      
+      // Extraer las longitudes
+      const lengthStr = data.split(':')[0];
+      const lengths = lengthStr.split(',').map(Number);
+      
+      // Tomar solo la parte después del segundo ':'
       const dataPart = loginMessage.split(':').slice(2).join(':');
-      if (!dataPart) return null;
       
-      // Dividir los datos por comas
-      const [protocol, guid, name, deviceInfo, client, message, avatar] = dataPart.split(',');
+      // Extraer cada campo según su longitud
+      let position = 0;
+      const fields = [];
+      for (const length of lengths) {
+        const value = dataPart.substring(position, position + length);
+        position += length;
+        fields.push(value);
+      }
       
-      if (!name || !guid) return null;
-      
-      return new User({
+      // Mapear los campos manualmente en el orden correcto
+      const [
+        protocol,
         guid,
         name,
         deviceInfo,
         client,
-        personalMessage: message,
-        avatar: avatar || '/default.png',
-        connected: true
+        personalMessage,
+        avatar
+      ] = fields;
+      
+      console.log('Campos extraídos:', {
+        protocol,
+        guid,
+        name,
+        deviceInfo,
+        client,
+        personalMessage,
+        avatar
+      });
+      
+      if (!name || !guid) {
+        console.error('Faltan campos obligatorios (nombre o guid)');
+        return null;
+      }
+      
+      return new User({
+        guid: guid.trim(),
+        name: name.trim(),
+        deviceInfo: (deviceInfo || '').trim(),
+        client: (client || 'webchat radio').trim(),
+        personalMessage: (personalMessage || '').trim(),
+        avatar: (avatar || '/default.png').trim(),
+        connected: true,
+        lastSeen: new Date()
       });
     } catch (error) {
       console.error('Error al parsear mensaje de login:', error);
