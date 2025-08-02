@@ -23,11 +23,11 @@ const server = WebSocketServer.getInstance({
 // Cliente para conectarse al servidor externo
 const externalWsClient = new WebSocketClient(`ws://186.137.241.231:46579`);
 
+// Mapa de usuarios conectados: socketId -> userName
+const connectedUsers = new Map<string, string>();
+
 // Inicializar la lista de usuarios
 const userList = UserList.getInstance();
-
-// Mapa para mantener el seguimiento de los clientes autenticados
-const authenticatedClients = new Map<string, string>(); // socketId -> username
 
 
 // Manejar mensajes del servidor externo
@@ -45,9 +45,8 @@ externalWsClient.onMessage((data: string) => {
 server
   .onConnection((ws) => {
     console.log(`Cliente conectado: ${ws.data.id}`);
-    // Inicializar datos del cliente
-    ws.data.authenticated = false;
-    ws.data.username = null;
+    // Inicializar como invitado
+    connectedUsers.set(ws.data.id, 'guest');
   })
   .onMessage((ws, message) => {
     const msg = message.toString();
@@ -55,55 +54,38 @@ server
 
     // Manejar mensaje de LOGIN
     if (msg.startsWith('LOGIN:')) {
-      try {
-        const user = User.fromLoginMessage(msg);
-        if (user) {
-          // Asignar el ID de socket al usuario
-          user.socketId = ws.data.id;
-          
-          // Guardar el usuario en la lista
-          userList.addUser(user);
-          
-          // Registrar el cliente como autenticado
-          ws.data.authenticated = true;
-          ws.data.username = user.name;
-          authenticatedClients.set(ws.data.id, user.name);
-          
-          console.log(`Usuario autenticado: ${user.name} (socket: ${ws.data.id})`);
-          
-          // Enviar confirmación al cliente
-          ws.send(`LOGIN_OK:${user.name}`);
-        } else {
-          ws.send('ERROR:Formato de login inválido');
-        }
-      } catch (error) {
-        console.error('Error en el proceso de login:', error);
-        ws.send('ERROR:Error en el proceso de autenticación');
+      const user = User.fromLoginMessage(msg);
+      if (user) {
+        // Guardar el usuario en la lista
+        userList.addUser(user);
+        
+        // Registrar el usuario conectado
+        connectedUsers.set(ws.data.id, user.name);
+        
+        console.log(`Usuario autenticado: ${user.name}`);
+        
+        // Enviar confirmación al cliente
+        ws.send(`LOGIN_OK:${user.name}`);
+      } else {
+        ws.send('ERROR:Formato de login inválido');
       }
       return;
     }
 
     // Manejar mensaje PUBLIC
     if (msg.startsWith('PUBLIC:')) {
-      // Verificar si el usuario está autenticado
-      if (!ws.data.authenticated || !ws.data.username) {
+      const userName = connectedUsers.get(ws.data.id);
+      if (!userName || userName === 'guest') {
         ws.send('ERROR:Debe hacer login primero');
         return;
       }
       
-      try {
-        // Obtener el texto después de PUBLIC:
-        const messageText = msg.substring(7).trim();
-        const username = ws.data.username;
-        
-        // Reenviar al servidor externo en el formato requerido
-        externalWsClient.send(`PUBLIC: ${username} > ${messageText}`);
-        
-        console.log(`Mensaje público de ${username}: ${messageText}`);
-      } catch (error) {
-        console.error('Error al procesar mensaje público:', error);
-        ws.send('ERROR:Error al enviar el mensaje');
-      }
+      // Obtener el texto después de PUBLIC:
+      const messageText = msg.substring(7).trim();
+      
+      // Reenviar al servidor externo
+      externalWsClient.send(`PUBLIC: ${userName} > ${messageText}`);
+      console.log(`Mensaje público de ${userName}: ${messageText}`);
       return;
     }
 
@@ -111,17 +93,17 @@ server
     console.log(`Mensaje no manejado de ${ws.data.userId || 'unknown'}:`, msg);
   })
   .onClose((ws) => {
-    // Limpiar el registro del cliente autenticado si existe
-    if (ws.data.authenticated && ws.data.username) {
-      const username = ws.data.username;
-      authenticatedClients.delete(ws.data.id);
+    // Limpiar el registro del usuario
+    const userName = connectedUsers.get(ws.data.id);
+    if (userName) {
+      connectedUsers.delete(ws.data.id);
       
       // Actualizar el estado del usuario
-      const user = userList.getUser(username);
+      const user = userList.getUser(userName);
       if (user) {
         user.connected = false;
         user.lastSeen = new Date();
-        console.log(`Usuario desconectado: ${username}`);
+        console.log(`Usuario desconectado: ${userName}`);
       }
     }
   })

@@ -44,6 +44,7 @@ export class WebSocketClient {
 
     this.ws.on('message', (data: string | Buffer) => {
       try {
+        console.log(data.toString())
         const newData = data.toString();
         if(newData.startsWith("ACK")){
           this.pingInterval = setInterval(() => {
