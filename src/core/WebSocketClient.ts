@@ -45,6 +45,7 @@ export class WebSocketClient{
         }
       });
       this.client.on('close', () => {
+        this.close();
         console.log('Cliente desconectado');
       });
       this.client.on('error', (error) => {
@@ -58,9 +59,19 @@ export class WebSocketClient{
     this.client.send(message);
   }
 
-  close(): void {
-    if (!this.client) return;
-    this.client.close();
+  sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
-
+  
+  async close(): Promise<void> {
+    if (!this.client) return;
+  
+    this.client.close();
+  
+    console.log('Esperando para reconectar...');
+    await this.sleep(5000); // ✅ ahora sí podés usar await
+  
+    WebSocketClient.getInstance().connect();
+  }
+  
 }
