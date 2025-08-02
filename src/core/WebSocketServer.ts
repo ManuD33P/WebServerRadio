@@ -66,4 +66,27 @@ export class ServerSocket {
         client.send(message);
       });
     }
+
+    public sendToClient(clientId: string, message: string): void {
+      const socket = this.server.clients as Set<CustomWebSocket>;
+      for (const client of socket) {
+        if (client.id === clientId) {
+          client.send(message);
+          break;
+        }
+      }
+    }
+
+    /**
+     * Envía un mensaje a todos los clientes conectados
+     * @param message Mensaje a enviar
+     */
+    public broadcast(message: string): void {
+      const clients = this.server.clients as Set<CustomWebSocket>;
+      clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(message);
+        }
+      });
+    }
 }

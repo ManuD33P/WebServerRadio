@@ -6,6 +6,8 @@ export interface UserData {
   personalMessage: string;
   avatar: string;
   connected: boolean;
+  level?: number;
+  points?: number;
   lastSeen?: Date;
 }
 
@@ -17,6 +19,8 @@ export class User {
   public personalMessage: string;
   public avatar: string;
   public connected: boolean;
+  public level: number;
+  public points: number;
   public lastSeen: Date;
   public socketId?: string; // ID de la conexión WebSocket
 
@@ -28,6 +32,8 @@ export class User {
     this.personalMessage = data.personalMessage || '';
     this.avatar = data.avatar || '/default.png';
     this.connected = data.connected ?? false;
+    this.level = data.level || 0;
+    this.points = data.points || 0;
     this.lastSeen = data.lastSeen || new Date();
   }
 
