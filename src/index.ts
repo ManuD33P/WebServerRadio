@@ -29,8 +29,6 @@ const userList = UserList.getInstance();
 // Mapa para mantener el seguimiento de los clientes autenticados
 const authenticatedClients = new Map<string, string>(); // socketId -> username
 
-// Conectar al servidor externo
-externalWsClient.connect();
 
 // Manejar mensajes del servidor externo
 externalWsClient.onMessage((data: string) => {
