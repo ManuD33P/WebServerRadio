@@ -73,6 +73,7 @@ server
     // Manejar mensaje PUBLIC
     if (msg.startsWith('PUBLIC:')) {
       const userId = ws.data.userId;
+      console.log('Esta es la id del usuario: ', userId);
       // Verificar si el usuario ha hecho login
       if (userId && userId.startsWith('guest-')) {
         ws.send('ERROR:Debe hacer login primero');
@@ -81,9 +82,9 @@ server
       
       // Obtener el texto después de PUBLIC:
       const messageText = msg.substring(7).trim();
-      
+      const user = userList.getUser(userId);
       // Reenviar al servidor externo en el formato requerido
-      externalWsClient.send(`PUBLIC: ${userId} > ${messageText}`);
+      externalWsClient.send(`PUBLIC: ${user?.name} > ${messageText}`);
       
       console.log(`Mensaje público de ${userId}: ${messageText}`);
       return;
