@@ -49,6 +49,7 @@ export class WebSocketClient{
         console.log('Cliente desconectado');
       });
       this.client.on('error', (error) => {
+        this.close();
         console.log('Error', error);
       });
   }
